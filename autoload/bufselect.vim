@@ -94,10 +94,8 @@ func s:filterNames(id, key) abort
     let key_handled = 1
   elseif a:key == "\<C-F>"
         \ || a:key == "\<C-B>"
-        \ || a:key == "<PageUp>"
-        \ || a:key == "<PageDown>"
-        \ || a:key == "<C-Home>"
-        \ || a:key == "<C-End>"
+        \ || a:key == "j"
+        \ || a:key == "k"
     call win_execute(s:popup_winid, 'normal! ' .. a:key)
     let key_handled = 1
   elseif a:key == "\<Up>"
