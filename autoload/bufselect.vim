@@ -28,9 +28,12 @@ let s:buflist = []
 let s:popup_text = []
 let s:filter_text = ''
 let s:popup_winid = -1
+let s:search_mode = -1
 
 " Edit the buffer selected from the popup menu
 func s:editBuffer(id, result) abort
+  let s:search_mode = -1
+
   if a:result <= 0
     return
   endif
@@ -85,39 +88,65 @@ func s:filterNames(id, key) abort
   let update_popup = 0
   let key_handled = 0
 
-  if a:key == "\<BS>"
-    " Erase one character from the filter text
-    if len(s:filter_text) >= 1
-      let s:filter_text = s:filter_text[:-2]
-      let update_popup = 1
-    endif
-    let key_handled = 1
-  elseif a:key == "\<C-F>"
-        \ || a:key == "\<C-B>"
-        \ || a:key == "j"
-        \ || a:key == "k"
-    call win_execute(s:popup_winid, 'normal! ' .. a:key)
-    let key_handled = 1
-  elseif a:key == "\<Up>"
-        \ || a:key == "\<Down>"
-    " Use native Vim handling of these keys
-    let key_handled = 0
-  elseif a:key =~ '\f' || a:key == "\<Space>"
-    " Filter the names based on the typed key and keys typed before
-    " Accept the typed key only if it is present in any of the buffer names
-    let newsearch = s:filter_text .. a:key
-    let found = 0
-    for bname in s:popup_text
-      if bname =~# newsearch
-        let found = 1
-        break
+  if s:search_mode == 1
+    if a:key == "\<BS>"
+      " Erase one character from the filter text
+      if len(s:filter_text) >= 1
+        let s:filter_text = s:filter_text[:-2]
+      else
+          let s:search_mode = -1
       endif
-    endfor
-    if found
-      let s:filter_text ..= a:key
+
       let update_popup = 1
+
+      let key_handled = 1
+    elseif a:key =~ '\f' || a:key == "\<Space>"
+      " Filter the names based on the typed key and keys typed before
+      " Accept the typed key only if it is present in any of the buffer names
+      let newsearch = s:filter_text .. a:key
+      let found = 0
+      for bname in s:popup_text
+        if bname =~# newsearch
+          let found = 1
+          break
+        endif
+      endfor
+      if found
+        let s:filter_text ..= a:key
+        let update_popup = 1
+      endif
+      let key_handled = 1
     endif
-    let key_handled = 1
+  else
+    if a:key == "/"
+        let s:search_mode = 1
+        let key_handled = 1
+        let update_popup = 1
+    elseif a:key == "d" || a:key == "\<C-D>" " 删除 buffer
+      let curLine = line('.', s:popup_winid)
+      exe "bd \"" .. s:buflist[curLine-1] .. "\""
+      call remove(s:buflist, curLine-1)
+      if len(s:buflist) == 0
+          call bufselect#toggle()
+          return
+      endif
+
+      let update_popup = 1
+      let key_handled = 1
+    elseif a:key == "J"
+      call win_execute(s:popup_winid, 'normal! <enter>')
+      let key_handled = 1
+    elseif a:key == "\<C-F>"
+          \ || a:key == "\<C-B>"
+          \ || a:key == "j"
+          \ || a:key == "k"
+      call win_execute(s:popup_winid, 'normal! ' .. a:key)
+      let key_handled = 1
+    elseif a:key == "\<Up>"
+          \ || a:key == "\<Down>"
+      " Use native Vim handling of these keys
+      let key_handled = 0
+    endif
   endif
 
   if update_popup
@@ -133,9 +162,15 @@ func s:filterNames(id, key) abort
     call popup_settext(a:id, items)
     " Update the title to include the filter text
     let title = 'Buffers'
-    if len(s:filter_text) > 0
-      let title ..= ' (' . s:filter_text .. ')'
+
+    if s:search_mode == 1
+        let title ..= " /"
     endif
+
+    if len(s:filter_text) > 0
+      let title ..= s:filter_text
+    endif
+
     call popup_setoptions(a:id, {'title' : title})
 
     " Select the previously selected entry. If not present, seelct first entry
